@@ -72,10 +72,10 @@ def tmp_listener():
                 known.append(hash)
 
                 if file not in known_filenames:
-                    print("[*] New File: %s (%s)" % (file, hash))
+                    print(f"[*] New File: {file} ({hash})")
                     known_filenames.append(file)
                 else:
-                    print("[*] File Updated: %s (%s)" % (file, hash))
+                    print(f"[*] File Updated: {file} ({hash})")
 
         for file in os.listdir("/Library/Application Support/JAMF/Downloads"):
             try:
@@ -96,10 +96,10 @@ def tmp_listener():
                 known.append(hash)
 
                 if file not in known_filenames:
-                    print("[*] New File: %s (%s)" % (file, hash))
+                    print(f"[*] New File: {file} ({hash})")
                     known_filenames.append(file)
                 else:
-                    print("[*] File Updated: %s (%s)" % (file, hash))
+                    print(f"[*] File Updated: {file} ({hash})")
 
 
 def args_listener():
@@ -111,26 +111,30 @@ def args_listener():
 
         for res in results:
             cmd = res.decode('utf-8')
-            if "jamf" in cmd.lower() and not cmd.startswith("(") and not cmd.endswith(")"):
-                if cmd.startswith("sh -c PATH=$PATH:/usr/local/jamf/bin;"):
-                    hash = hashlib.md5(res).hexdigest()
+            if (
+                "jamf" in cmd.lower()
+                and not cmd.startswith("(")
+                and not cmd.endswith(")")
+                and cmd.startswith("sh -c PATH=$PATH:/usr/local/jamf/bin;")
+            ):
+                hash = hashlib.md5(res).hexdigest()
 
-                    if hash not in known:
-                        args = cmd.split(";")[1].strip().split("'")[1::2]
+                if hash not in known:
+                    args = cmd.split(";")[1].strip().split("'")[1::2]
 
-                        if args[0] == "/bin/sh":
-                            args = args[1:]
+                    if args[0] == "/bin/sh":
+                        args = args[1:]
 
-                        print("[*] New Process: %s" % args[0])
-                        print("    - Mount Point: %s" % args[1])
-                        print("    - Computer Name: %s" % args[2])
-                        print("    - Username: %s" % args[3])
-                        print("    - Parameters:")
+                    print(f"[*] New Process: {args[0]}")
+                    print(f"    - Mount Point: {args[1]}")
+                    print(f"    - Computer Name: {args[2]}")
+                    print(f"    - Username: {args[3]}")
+                    print("    - Parameters:")
 
-                        for i, arg in enumerate(args[4:13]):
-                            print("        %i: %s" % (i+4, arg))
+                    for i, arg in enumerate(args[4:13]):
+                        print("        %i: %s" % (i+4, arg))
 
-                        known.append(hash)
+                    known.append(hash)
 
 threads = []
 

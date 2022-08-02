@@ -9,11 +9,11 @@ from getpass import getpass
 url = input("[?] JSS URL (https://blah.jamfcloud.com): ")
 username = input("[?] JSS Username: ")
 password = getpass("[?] JSS Password: ")
-auth_string = "%s:%s" % (username, password)
+auth_string = f"{username}:{password}"
 
-auth = "Basic %s" % b64encode(auth_string.encode("utf-8")).decode("utf-8")
+auth = f'Basic {b64encode(auth_string.encode("utf-8")).decode("utf-8")}'
 
-api_url = "%s/JSSResource" % url
+api_url = f"{url}/JSSResource"
 
 try:
     os.mkdir(url)
@@ -27,16 +27,16 @@ except:
 def dump(friendly_name, name, item_list, item):
     print("\n")
     print("#"*(len(friendly_name) + 4))
-    print("# %s #" % friendly_name)
+    print(f"# {friendly_name} #")
     print("#"*(len(friendly_name) + 4))
     print("\n")
 
     try:
-        os.mkdir("%s/%s" % (url, friendly_name))
+        os.mkdir(f"{url}/{friendly_name}")
     except:
         pass
 
-    r = requests.get("%s/%s" % (api_url, name), headers={ "Authorization": auth })
+    r = requests.get(f"{api_url}/{name}", headers={ "Authorization": auth })
 
     if r.status_code != 200:
         print(r)
@@ -45,13 +45,17 @@ def dump(friendly_name, name, item_list, item):
 
     # Iterate and Print
     for item in xmltodict.parse(r.text)[item_list][item]:
-        if os.path.exists("%s/%s/%s" % (url, friendly_name, item['id'])):
-            print("%s already exists... skipping." % item['id'])
+        if os.path.exists(f"{url}/{friendly_name}/{item['id']}"):
+            print(f"{item['id']} already exists... skipping.")
             continue
 
-        print("%s - %s" % (item['id'], item['name']))
+        print(f"{item['id']} - {item['name']}")
 
-        r = requests.get(api_url + "/%s/id/%s" % (name, item['id']), headers={ "Authorization": auth })
+        r = requests.get(
+            api_url + f"/{name}/id/{item['id']}",
+            headers={"Authorization": auth},
+        )
+
 
         if r.status_code != 200:
             print(r)
@@ -61,7 +65,7 @@ def dump(friendly_name, name, item_list, item):
         dom = xml.dom.minidom.parseString(r.text)
         pretty_xml = dom.toprettyxml()
 
-        with open("%s/%s/%s" % (url, friendly_name, item['id']), "w") as f:
+        with open(f"{url}/{friendly_name}/{item['id']}", "w") as f:
             f.write(pretty_xml)
 
 

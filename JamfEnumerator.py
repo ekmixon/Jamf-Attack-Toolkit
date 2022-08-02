@@ -32,7 +32,7 @@ headers = {
 
 def print_debug(msg):
     if args.debug:
-        print((bcolors.OKBLUE + "[%] %s" + bcolors.ENDC) % msg)
+        print(f"{bcolors.OKBLUE}[%] %s{bcolors.ENDC}" % msg)
  
 parser = argparse.ArgumentParser(description="Enumerates LDAP user objects when connected to Jamf.")
 parser.add_argument('jss', help='URL of the JSS')
@@ -51,7 +51,7 @@ if "enroll" not in args.jss:
 
     args.jss += "enroll/"
 
-ajax_url = args.jss + 'enroll.ajax'
+ajax_url = f'{args.jss}enroll.ajax'
 
 if args.username is None:
     print("[!] Must supply either --username.")
@@ -59,28 +59,29 @@ if args.username is None:
 if args.password is None:
     print("[!] Must supply either --password.")
 
-print("[*] JSS Enrollment URL: %s" % args.jss)
-print("[*] JSS Ajax URL: %s" % ajax_url)
+print(f"[*] JSS Enrollment URL: {args.jss}")
+print(f"[*] JSS Ajax URL: {ajax_url}")
 
 try:
     s = requests.Session()
     r = s.get(args.jss, headers=headers, verify=False)
 
     if r.status_code == 200:
-        print("[*] Status: " + bcolors.OKGREEN + "Up" + bcolors.ENDC)
-        
+        print(f"[*] Status: {bcolors.OKGREEN}Up{bcolors.ENDC}")
+
     else:
         raise Exception("Initial checks returned HTTP status code: %i." % r.status_code)
 except Exception as e:
-    print("[!] Status: " + bcolors.FAIL + "Down or Unreachable" + bcolors.ENDC)
-    print("[!] Error: %s" % e)
+    print(f"[!] Status: {bcolors.FAIL}Down or Unreachable{bcolors.ENDC}")
+    print(f"[!] Error: {e}")
     sys.exit()
 
 
 print("[*] Attempting authentication.")
 
 
-data = 'lastPage=login.jsp&payload=&device-detect-complete=&username={}&password={}'.format(args.username, args.password)
+data = f'lastPage=login.jsp&payload=&device-detect-complete=&username={args.username}&password={args.password}'
+
 s = requests.Session()
 r = s.post(args.jss, headers=headers, data=data, verify=False, allow_redirects=False)
 
@@ -93,7 +94,7 @@ else:
 confirmation = input("[?] Ready? [y/N] ")
 
 if confirmation.lower() != "y":
-    print("[!] " + bcolors.FAIL + "Aborting" + bcolors.ENDC)
+    print(f"[!] {bcolors.FAIL}Aborting{bcolors.ENDC}")
     sys.exit()
 
 headers = {
@@ -104,36 +105,37 @@ headers = {
 
 def parse_results(t):
     lines = t.splitlines()
-    results = [x.replace("<user>","").replace("</user>","") for x in lines if "user" in x]
-    return results
+    return [
+        x.replace("<user>", "").replace("</user>", "")
+        for x in lines
+        if "user" in x
+    ]
 
 users = set()
 
 def do_query(s, q):
-    r = s.post(ajax_url, headers=headers, data="username={}".format(q), verify=False) 
+    r = s.post(ajax_url, headers=headers, data=f"username={q}", verify=False)
     {users.add(u) for u in parse_results(r.text)} 
 
 if args.query:
     print("[*] Querying '%s'." % (args.query))
-    r = s.post(ajax_url, headers=headers, data="username={}".format(args.query), verify=False) 
-    {users.add(u) for u in parse_results(r.text)} 
-    print(users)
-else:    
+    r = s.post(
+        ajax_url, headers=headers, data=f"username={args.query}", verify=False
+    )
+
+    {users.add(u) for u in parse_results(r.text)}
+else:
     print("[*] Querying the world.")
     query_set = product(string.ascii_lowercase + string.digits, repeat=int(args.depth))
 
     p = ThreadPoolExecutor(max_workers=int(args.threads))
-    futures = []
+    futures = [p.submit(do_query, s, ''.join(q)) for q in query_set]
 
-    for q in query_set:
-        futures.append(p.submit(do_query, s, ''.join(q)))
-
-    for f in tqdm(as_completed(futures), leave=True, total=len(futures)):
+    for _ in tqdm(as_completed(futures), leave=True, total=len(futures)):
         pass
-   
-    print("[*] Found %i users." % len(users))
-    print(users)
 
+    print("[*] Found %i users." % len(users))
+print(users)
 if args.output:
     try:
         with open(args.output, 'w') as f:

